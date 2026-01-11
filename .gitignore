@@ -1,3 +1,16 @@
+.env
+.env.*
+!.env.example
+.DS_Store
+__pycache__
+.idea
+KMS
+.venv
+.vscode
+*.egg-info
+.pytest_cache
+.ruff_cache
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]
