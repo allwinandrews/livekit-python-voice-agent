@@ -1,3 +1,6 @@
+Live demo: https://livekit-voice-agent-frontend.vercel.app/
+Frontend repo: https://github.com/allwinandrews/livekit-voice-agent-frontend/
+
 <a href="https://livekit.io/">
   <img src="./.github/assets/livekit-mark.png" alt="LiveKit logo" width="100" height="100">
 </a>
