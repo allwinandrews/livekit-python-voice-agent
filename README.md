@@ -1,100 +1,100 @@
-````markdown
+````md
 Live demo: https://livekit-voice-agent-frontend.vercel.app/  
-Frontend repository: https://github.com/allwinandrews/livekit-voice-agent-frontend/
+Frontend repo: https://github.com/allwinandrews/livekit-voice-agent-frontend/
 
 <a href="https://livekit.io/">
   <img src="./.github/assets/livekit-mark.png" alt="LiveKit logo" width="100" height="100">
 </a>
 
-# LiveKit Voice Agent – Python Backend
+# LiveKit Agents Starter – Python
 
-This repository contains the **Python backend voice agent** built using **LiveKit Agents** as part of the _Python Developer Test: Build a Voice Agent with LiveKit_.
+A complete Python-based voice agent built with [LiveKit Agents for Python](https://github.com/livekit/agents) and deployed on [LiveKit Cloud](https://cloud.livekit.io/).
 
-The project demonstrates:
+This project was implemented as part of a **Python Developer Test** and covers:
 
-- A fully working **Stage 1** single-prompt voice agent
-- A clear foundation to extend into **Stage 2** structured, state-based conversation flows
-
-The backend is deployed on **LiveKit Cloud** and connected to a live React frontend.
+- **Stage 1**: A fully working voice AI agent (speech → LLM → speech)
+- **Stage 2 (design + partial implementation)**: A structured, state-based conversation flow
 
 ---
 
-## Stage 1 – Basic Voice Agent (Completed)
+## What this project does
 
-The agent successfully:
+The agent:
 
 - Joins a LiveKit room
-- Listens to user speech via microphone
-- Converts speech to text (STT)
+- Listens to the user’s voice
+- Transcribes speech to text (STT)
 - Sends text to an LLM
-- Converts the LLM response back to speech (TTS)
-- Streams synthesized audio back to the room
+- Converts the response back to speech (TTS)
+- Streams the audio response back into the room in real time
 
-### Technology Stack
-
-- **LiveKit Agents (Python SDK)**
-- **Speech-to-Text**: AssemblyAI (streaming)
-- **LLM**: OpenAI (GPT-4.1-mini)
-- **Text-to-Speech**: Cartesia
-- **Turn Detection**: LiveKit Multilingual Turn Detector
-- **Voice Activity Detection**: Silero VAD
-- **Noise Cancellation**: LiveKit Cloud BVC
+A production-ready React frontend is deployed separately and connects to this agent.
 
 ---
 
-## Live Demo
+## Key features
 
-You can talk to the agent live using the deployed frontend:
-
-**Live Demo:**  
-https://livekit-voice-agent-frontend.vercel.app/
-
-**Frontend Repository:**  
-https://github.com/allwinandrews/livekit-voice-agent-frontend/
-
-The frontend is based on the official LiveKit React Agent Starter and requires no custom UI changes for Stage 1 or Stage 2.
-
----
-
-## Architecture Overview
-
-- **Backend (this repo)**  
-  Handles all voice processing, inference, and conversation logic using LiveKit Agents.
-
-- **Frontend (separate repo)**  
-  Provides microphone access, audio playback, and session control using LiveKit’s React SDK.
-
-All conversation intelligence lives entirely in the backend.
+- Voice AI pipeline using:
+  - **STT**: AssemblyAI
+  - **LLM**: OpenAI (GPT-4.1 mini)
+  - **TTS**: Cartesia
+- LiveKit turn detection with multilingual support
+- Background noise cancellation
+- Preemptive response generation for low-latency voice interaction
+- Dockerized and deployed on LiveKit Cloud
+- Compatible with web, mobile, or telephony frontends
 
 ---
 
-## Dev Setup
+## Stage 2: Structured Conversation Flow (State-Based Design)
 
-### Prerequisites
+This project is designed to support **state/DAG-based conversations**, similar to tools like Retell AI.
 
-- Python 3.10+
-- LiveKit Cloud account
-- LiveKit CLI installed
-- `uv` package manager
+### Use case chosen
 
-### Install dependencies
+**Appointment scheduling**
+
+### Example conversation states
+
+- `GREETING` – Welcomes the user and explains the task
+- `COLLECT_DETAILS` – Gathers required information (e.g. date, time)
+- `CONFIRMATION` – Confirms the collected details with the user
+- `RETRY / FALLBACK` – Handles unclear or invalid responses
+- `END` – Final confirmation and graceful exit
+
+### Why a state-based approach
+
+- Voice input is noisy and ambiguous
+- Explicit states reduce misinterpretation
+- Retries and confirmations improve reliability
+- Conversation logic becomes predictable, testable, and extensible
+
+The current backend structure supports maintaining:
+
+- `current_state`
+- conversation context (slots)
+- state-based routing per user turn
+
+Frontend changes are **not required** for Stage 2.
+
+---
+
+## Dev setup
+
+Clone the repository and install dependencies:
 
 ```bash
 uv sync
 ```
 ````
 
-### Environment variables
+Create `.env.local` from `.env.example` and set:
 
-Copy `.env.example` to `.env.local` and set:
+- `LIVEKIT_URL`
+- `LIVEKIT_API_KEY`
+- `LIVEKIT_API_SECRET`
 
-```env
-LIVEKIT_URL=
-LIVEKIT_API_KEY=
-LIVEKIT_API_SECRET=
-```
-
-You can also sync environment variables using the LiveKit CLI:
+Authenticate with LiveKit Cloud:
 
 ```bash
 lk cloud auth
@@ -103,27 +103,27 @@ lk app env -w -d .env.local
 
 ---
 
-## Running the Agent
+## Run the agent locally
 
-### Download required models (one-time)
+Download required models:
 
 ```bash
 uv run python src/agent.py download-files
 ```
 
-### Run locally in console mode
+Run in terminal (console mode):
 
 ```bash
 uv run python src/agent.py console
 ```
 
-### Run for frontend or telephony (development)
+Run for frontend / LiveKit Cloud development:
 
 ```bash
 uv run python src/agent.py dev
 ```
 
-### Production mode
+Production entrypoint:
 
 ```bash
 uv run python src/agent.py start
@@ -131,44 +131,27 @@ uv run python src/agent.py start
 
 ---
 
-## Stage 2 – Structured Conversation Flow (Planned / In Progress)
+## Frontend
 
-Stage 2 extends the agent to support **state-based, multi-turn conversations** similar to Retell AI’s conversation flow model.
+The frontend is a React + Next.js app based on LiveKit’s official starter.
 
-### Planned Use Case
+- **Live demo**: [https://livekit-voice-agent-frontend.vercel.app/](https://livekit-voice-agent-frontend.vercel.app/)
+- **Repository**: [https://github.com/allwinandrews/livekit-voice-agent-frontend/](https://github.com/allwinandrews/livekit-voice-agent-frontend/)
 
-Appointment scheduling (example)
+The frontend handles:
 
-### Key Concepts
+- microphone capture
+- room connection
+- audio playback
+- transcripts
 
-- Explicit conversation **states**
-- Deterministic **state transitions**
-- Shared **conversation context**
-- Retry and fallback handling for voice misunderstandings
-
-### Example States
-
-- `GREETING`
-- `COLLECT_DETAILS`
-- `CONFIRM_DETAILS`
-- `RETRY_FALLBACK`
-- `TERMINAL_END`
-
-### Why a State-Based Approach
-
-- Voice input is noisy and ambiguous
-- Explicit states prevent hallucinated flow
-- Improves reliability and user trust
-- Makes multi-turn conversations predictable and testable
-
-Stage 2 logic is implemented entirely in the backend.
-**No frontend changes are required.**
+No frontend changes are required for Stage 2.
 
 ---
 
 ## Tests
 
-Run the evaluation and test suite:
+Run backend tests with:
 
 ```bash
 uv run pytest
@@ -178,28 +161,14 @@ uv run pytest
 
 ## Deployment
 
-This project includes a production-ready `Dockerfile` and is deployed using **LiveKit Cloud Agents**.
-
-For deployment details, see:
-[https://docs.livekit.io/agents/ops/deployment/](https://docs.livekit.io/agents/ops/deployment/)
-
----
-
-## Self-Hosted LiveKit (Optional)
-
-You may self-host LiveKit if desired. In that case:
-
-- Replace LiveKit Inference models with plugin-based models
-- Remove LiveKit Cloud noise cancellation
-
-Docs:
-[https://docs.livekit.io/home/self-hosting/](https://docs.livekit.io/home/self-hosting/)
+The backend is deployed to **LiveKit Cloud** using the provided Dockerfile.
+The frontend is deployed on **Vercel**.
 
 ---
 
 ## License
 
-This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
+This project is licensed under the MIT License – see the [LICENSE](LICENSE) file for details.
 
 ```
 
