@@ -1,145 +1,206 @@
-Live demo: https://livekit-voice-agent-frontend.vercel.app/
-Frontend repo: https://github.com/allwinandrews/livekit-voice-agent-frontend/
+````markdown
+Live demo: https://livekit-voice-agent-frontend.vercel.app/  
+Frontend repository: https://github.com/allwinandrews/livekit-voice-agent-frontend/
 
 <a href="https://livekit.io/">
   <img src="./.github/assets/livekit-mark.png" alt="LiveKit logo" width="100" height="100">
 </a>
 
-# LiveKit Agents Starter - Python
+# LiveKit Voice Agent – Python Backend
 
-A complete starter project for building voice AI apps with [LiveKit Agents for Python](https://github.com/livekit/agents) and [LiveKit Cloud](https://cloud.livekit.io/).
+This repository contains the **Python backend voice agent** built using **LiveKit Agents** as part of the _Python Developer Test: Build a Voice Agent with LiveKit_.
 
-The starter project includes:
+The project demonstrates:
 
-- A simple voice AI assistant, ready for extension and customization
-- A voice AI pipeline with [models](https://docs.livekit.io/agents/models) from OpenAI, Cartesia, and AssemblyAI served through LiveKit Cloud
-  - Easily integrate your preferred [LLM](https://docs.livekit.io/agents/models/llm/), [STT](https://docs.livekit.io/agents/models/stt/), and [TTS](https://docs.livekit.io/agents/models/tts/) instead, or swap to a realtime model like the [OpenAI Realtime API](https://docs.livekit.io/agents/models/realtime/openai)
-- Eval suite based on the LiveKit Agents [testing & evaluation framework](https://docs.livekit.io/agents/build/testing/)
-- [LiveKit Turn Detector](https://docs.livekit.io/agents/build/turns/turn-detector/) for contextually-aware speaker detection, with multilingual support
-- [Background voice cancellation](https://docs.livekit.io/home/cloud/noise-cancellation/)
-- Integrated [metrics and logging](https://docs.livekit.io/agents/build/metrics/)
-- A Dockerfile ready for [production deployment](https://docs.livekit.io/agents/ops/deployment/)
+- A fully working **Stage 1** single-prompt voice agent
+- A clear foundation to extend into **Stage 2** structured, state-based conversation flows
 
-This starter app is compatible with any [custom web/mobile frontend](https://docs.livekit.io/agents/start/frontend/) or [SIP-based telephony](https://docs.livekit.io/agents/start/telephony/).
+The backend is deployed on **LiveKit Cloud** and connected to a live React frontend.
 
-## Coding agents and MCP
+---
 
-This project is designed to work with coding agents like [Cursor](https://www.cursor.com/) and [Claude Code](https://www.anthropic.com/claude-code). 
+## Stage 1 – Basic Voice Agent (Completed)
 
-To get the most out of these tools, install the [LiveKit Docs MCP server](https://docs.livekit.io/mcp).
+The agent successfully:
 
-For Cursor, use this link:
+- Joins a LiveKit room
+- Listens to user speech via microphone
+- Converts speech to text (STT)
+- Sends text to an LLM
+- Converts the LLM response back to speech (TTS)
+- Streams synthesized audio back to the room
 
-[![Install MCP Server](https://cursor.com/deeplink/mcp-install-light.svg)](https://cursor.com/en-US/install-mcp?name=livekit-docs&config=eyJ1cmwiOiJodHRwczovL2RvY3MubGl2ZWtpdC5pby9tY3AifQ%3D%3D)
+### Technology Stack
 
-For Claude Code, run this command:
+- **LiveKit Agents (Python SDK)**
+- **Speech-to-Text**: AssemblyAI (streaming)
+- **LLM**: OpenAI (GPT-4.1-mini)
+- **Text-to-Speech**: Cartesia
+- **Turn Detection**: LiveKit Multilingual Turn Detector
+- **Voice Activity Detection**: Silero VAD
+- **Noise Cancellation**: LiveKit Cloud BVC
 
-```
-claude mcp add --transport http livekit-docs https://docs.livekit.io/mcp
-```
+---
 
-For Codex CLI, use this command to install the server:
-```
-codex mcp add --url https://docs.livekit.io/mcp livekit-docs
-```
+## Live Demo
 
-For Gemini CLI, use this command to install the server:
-```
-gemini mcp add --transport http livekit-docs https://docs.livekit.io/mcp
-```
+You can talk to the agent live using the deployed frontend:
 
-The project includes a complete [AGENTS.md](AGENTS.md) file for these assistants. You can modify this file  your needs. To learn more about this file, see [https://agents.md](https://agents.md).
+**Live Demo:**  
+https://livekit-voice-agent-frontend.vercel.app/
+
+**Frontend Repository:**  
+https://github.com/allwinandrews/livekit-voice-agent-frontend/
+
+The frontend is based on the official LiveKit React Agent Starter and requires no custom UI changes for Stage 1 or Stage 2.
+
+---
+
+## Architecture Overview
+
+- **Backend (this repo)**  
+  Handles all voice processing, inference, and conversation logic using LiveKit Agents.
+
+- **Frontend (separate repo)**  
+  Provides microphone access, audio playback, and session control using LiveKit’s React SDK.
+
+All conversation intelligence lives entirely in the backend.
+
+---
 
 ## Dev Setup
 
-Clone the repository and install dependencies to a virtual environment:
+### Prerequisites
 
-```console
-cd agent-starter-python
+- Python 3.10+
+- LiveKit Cloud account
+- LiveKit CLI installed
+- `uv` package manager
+
+### Install dependencies
+
+```bash
 uv sync
 ```
+````
 
-Sign up for [LiveKit Cloud](https://cloud.livekit.io/) then set up the environment by copying `.env.example` to `.env.local` and filling in the required keys:
+### Environment variables
 
-- `LIVEKIT_URL`
-- `LIVEKIT_API_KEY`
-- `LIVEKIT_API_SECRET`
+Copy `.env.example` to `.env.local` and set:
 
-You can load the LiveKit environment automatically using the [LiveKit CLI](https://docs.livekit.io/home/cli/cli-setup):
+```env
+LIVEKIT_URL=
+LIVEKIT_API_KEY=
+LIVEKIT_API_SECRET=
+```
+
+You can also sync environment variables using the LiveKit CLI:
 
 ```bash
 lk cloud auth
 lk app env -w -d .env.local
 ```
 
-## Run the agent
+---
 
-Before your first run, you must download certain models such as [Silero VAD](https://docs.livekit.io/agents/build/turns/vad/) and the [LiveKit turn detector](https://docs.livekit.io/agents/build/turns/turn-detector/):
+## Running the Agent
 
-```console
+### Download required models (one-time)
+
+```bash
 uv run python src/agent.py download-files
 ```
 
-Next, run this command to speak to your agent directly in your terminal:
+### Run locally in console mode
 
-```console
+```bash
 uv run python src/agent.py console
 ```
 
-To run the agent for use with a frontend or telephony, use the `dev` command:
+### Run for frontend or telephony (development)
 
-```console
+```bash
 uv run python src/agent.py dev
 ```
 
-In production, use the `start` command:
+### Production mode
 
-```console
+```bash
 uv run python src/agent.py start
 ```
 
-## Frontend & Telephony
+---
 
-Get started quickly with our pre-built frontend starter apps, or add telephony support:
+## Stage 2 – Structured Conversation Flow (Planned / In Progress)
 
-| Platform | Link | Description |
-|----------|----------|-------------|
-| **Web** | [`livekit-examples/agent-starter-react`](https://github.com/livekit-examples/agent-starter-react) | Web voice AI assistant with React & Next.js |
-| **iOS/macOS** | [`livekit-examples/agent-starter-swift`](https://github.com/livekit-examples/agent-starter-swift) | Native iOS, macOS, and visionOS voice AI assistant |
-| **Flutter** | [`livekit-examples/agent-starter-flutter`](https://github.com/livekit-examples/agent-starter-flutter) | Cross-platform voice AI assistant app |
-| **React Native** | [`livekit-examples/voice-assistant-react-native`](https://github.com/livekit-examples/voice-assistant-react-native) | Native mobile app with React Native & Expo |
-| **Android** | [`livekit-examples/agent-starter-android`](https://github.com/livekit-examples/agent-starter-android) | Native Android app with Kotlin & Jetpack Compose |
-| **Web Embed** | [`livekit-examples/agent-starter-embed`](https://github.com/livekit-examples/agent-starter-embed) | Voice AI widget for any website |
-| **Telephony** | [📚 Documentation](https://docs.livekit.io/agents/start/telephony/) | Add inbound or outbound calling to your agent |
+Stage 2 extends the agent to support **state-based, multi-turn conversations** similar to Retell AI’s conversation flow model.
 
-For advanced customization, see the [complete frontend guide](https://docs.livekit.io/agents/start/frontend/).
+### Planned Use Case
 
-## Tests and evals
+Appointment scheduling (example)
 
-This project includes a complete suite of evals, based on the LiveKit Agents [testing & evaluation framework](https://docs.livekit.io/agents/build/testing/). To run them, use `pytest`.
+### Key Concepts
 
-```console
+- Explicit conversation **states**
+- Deterministic **state transitions**
+- Shared **conversation context**
+- Retry and fallback handling for voice misunderstandings
+
+### Example States
+
+- `GREETING`
+- `COLLECT_DETAILS`
+- `CONFIRM_DETAILS`
+- `RETRY_FALLBACK`
+- `TERMINAL_END`
+
+### Why a State-Based Approach
+
+- Voice input is noisy and ambiguous
+- Explicit states prevent hallucinated flow
+- Improves reliability and user trust
+- Makes multi-turn conversations predictable and testable
+
+Stage 2 logic is implemented entirely in the backend.
+**No frontend changes are required.**
+
+---
+
+## Tests
+
+Run the evaluation and test suite:
+
+```bash
 uv run pytest
 ```
 
-## Using this template repo for your own project
+---
 
-Once you've started your own project based on this repo, you should:
+## Deployment
 
-1. **Check in your `uv.lock`**: This file is currently untracked for the template, but you should commit it to your repository for reproducible builds and proper configuration management. (The same applies to `livekit.toml`, if you run your agents in LiveKit Cloud)
+This project includes a production-ready `Dockerfile` and is deployed using **LiveKit Cloud Agents**.
 
-2. **Remove the git tracking test**: Delete the "Check files not tracked in git" step from `.github/workflows/tests.yml` since you'll now want this file to be tracked. These are just there for development purposes in the template repo itself.
+For deployment details, see:
+[https://docs.livekit.io/agents/ops/deployment/](https://docs.livekit.io/agents/ops/deployment/)
 
-3. **Add your own repository secrets**: You must [add secrets](https://docs.github.com/en/actions/how-tos/writing-workflows/choosing-what-your-workflow-does/using-secrets-in-github-actions) for `LIVEKIT_URL`, `LIVEKIT_API_KEY`, and `LIVEKIT_API_SECRET` so that the tests can run in CI.
+---
 
-## Deploying to production
+## Self-Hosted LiveKit (Optional)
 
-This project is production-ready and includes a working `Dockerfile`. To deploy it to LiveKit Cloud or another environment, see the [deploying to production](https://docs.livekit.io/agents/ops/deployment/) guide.
+You may self-host LiveKit if desired. In that case:
 
-## Self-hosted LiveKit
+- Replace LiveKit Inference models with plugin-based models
+- Remove LiveKit Cloud noise cancellation
 
-You can also self-host LiveKit instead of using LiveKit Cloud. See the [self-hosting](https://docs.livekit.io/home/self-hosting/) guide for more information. If you choose to self-host, you'll need to also use [model plugins](https://docs.livekit.io/agents/models/#plugins) instead of LiveKit Inference and will need to remove the [LiveKit Cloud noise cancellation](https://docs.livekit.io/home/cloud/noise-cancellation/) plugin.
+Docs:
+[https://docs.livekit.io/home/self-hosting/](https://docs.livekit.io/home/self-hosting/)
+
+---
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
+
+```
+
+```
