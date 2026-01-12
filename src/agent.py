@@ -44,6 +44,24 @@ BASE_STYLE = (
 )
 
 
+class Assistant(Agent):
+    def __init__(self) -> None:
+        super().__init__(
+            instructions=(
+                "You are a helpful and friendly assistant. "
+                "Keep responses short and natural. "
+                "Do not use emojis or special symbols. "
+                "If the user asks for personal info you don't have (like their birthplace), say you don't know. "
+                "If the user asks for harmful or illegal instructions (like hacking), refuse politely."
+            )
+        )
+
+    async def on_enter(self):
+        # Generate a reply for the current user turn.
+        # In tests, AgentSession.run(...) provides user_input and expects one assistant message.
+        await self.session.generate_reply()
+
+
 class EndAgent(Agent):
     def __init__(self, message: str = "Thanks. Goodbye.") -> None:
         super().__init__(
