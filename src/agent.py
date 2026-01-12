@@ -1,4 +1,6 @@
 import logging
+from dataclasses import dataclass
+from typing import Optional
 
 from dotenv import load_dotenv
 from livekit import rtc
@@ -8,10 +10,12 @@ from livekit.agents import (
     AgentSession,
     JobContext,
     JobProcess,
+    RunContext,
     cli,
     inference,
     room_io,
 )
+from livekit.agents.llm import function_tool
 from livekit.plugins import noise_cancellation, silero
 from livekit.plugins.turn_detector.multilingual import MultilingualModel
 
@@ -20,31 +24,228 @@ logger = logging.getLogger("agent")
 load_dotenv(".env.local")
 
 
-class Assistant(Agent):
-    def __init__(self) -> None:
+@dataclass
+class AppointmentData:
+    name: Optional[str] = None
+    reason: Optional[str] = None
+    date: Optional[str] = None
+    time: Optional[str] = None
+    contact: Optional[str] = None
+    confirmed: bool = False
+    retries: int = 0
+
+
+BASE_STYLE = (
+    "You are a helpful voice assistant for appointment scheduling. "
+    "Keep responses short and natural. "
+    "Ask one question at a time. "
+    "If the user is unclear, ask a brief follow up. "
+    "Do not use emojis or special symbols."
+)
+
+
+class EndAgent(Agent):
+    def __init__(self, message: str = "Thanks. Goodbye.") -> None:
         super().__init__(
-            instructions="""You are a helpful voice AI assistant. The user is interacting with you via voice, even if you perceive the conversation as text.
-            You eagerly assist users with their questions by providing information from your extensive knowledge.
-            Your responses are concise, to the point, and without any complex formatting or punctuation including emojis, asterisks, or other symbols.
-            You are curious, friendly, and have a sense of humor.""",
+            instructions=f"{BASE_STYLE} End the conversation politely. Say: {message}")
+
+    async def on_enter(self):
+        await self.session.generate_reply(allow_interruptions=False)
+
+
+class FallbackAgent(Agent):
+    def __init__(self, prompt: str) -> None:
+        super().__init__(
+            instructions=(
+                f"{BASE_STYLE} "
+                "The user response was unclear or incomplete. "
+                f"Ask again in a simpler way: {prompt}"
+            )
         )
 
-    # To add tools, use the @function_tool decorator.
-    # Here's an example that adds a simple weather tool.
-    # You also have to add `from livekit.agents import function_tool, RunContext` to the top of this file
-    # @function_tool
-    # async def lookup_weather(self, context: RunContext, location: str):
-    #     """Use this tool to look up current weather information in the given location.
-    #
-    #     If the location is not supported by the weather service, the tool will indicate this. You must tell the user the location's weather is unavailable.
-    #
-    #     Args:
-    #         location: The location to look up weather information for (e.g. city name)
-    #     """
-    #
-    #     logger.info(f"Looking up weather for {location}")
-    #
-    #     return "sunny with a temperature of 70 degrees."
+    async def on_enter(self):
+        await self.session.generate_reply()
+
+    @function_tool
+    async def retry_answered(self, context: RunContext[AppointmentData]) -> Agent:
+        context.userdata.retries = max(0, context.userdata.retries - 1)
+        return RouterAgent()
+
+
+class RouterAgent(Agent):
+    def __init__(self) -> None:
+        super().__init__(
+            instructions=f"{BASE_STYLE} Route to the next step based on missing fields.")
+
+    async def on_enter(self):
+        data = self.session.userdata
+        if data.retries >= 3:
+            await self.session.switch_agent(EndAgent("Sorry, I am having trouble understanding. Please try again later."))
+            return
+
+        if not data.name:
+            await self.session.switch_agent(CollectNameAgent())
+            return
+
+        if not data.reason:
+            await self.session.switch_agent(CollectReasonAgent())
+            return
+
+        if not data.date or not data.time:
+            await self.session.switch_agent(CollectDateTimeAgent())
+            return
+
+        if not data.contact:
+            await self.session.switch_agent(CollectContactAgent())
+            return
+
+        if not data.confirmed:
+            await self.session.switch_agent(ConfirmAgent())
+            return
+
+        await self.session.switch_agent(EndAgent("Your appointment is confirmed. Goodbye."))
+
+
+class IntroAgent(Agent):
+    def __init__(self) -> None:
+        super().__init__(
+            instructions=(
+                f"{BASE_STYLE} "
+                "Start the call. Briefly say you can help schedule an appointment. "
+                "Then ask for the user's name."
+            )
+        )
+
+    async def on_enter(self):
+        await self.session.generate_reply()
+
+
+class CollectNameAgent(Agent):
+    def __init__(self) -> None:
+        super().__init__(
+            instructions=(
+                f"{BASE_STYLE} "
+                "Ask for the user's name. "
+                "When you have the name, call set_name."
+            )
+        )
+
+    async def on_enter(self):
+        await self.session.generate_reply()
+
+    @function_tool
+    async def set_name(self, context: RunContext[AppointmentData], name: str) -> Agent:
+        context.userdata.name = name.strip()[:80] if name else None
+        if not context.userdata.name:
+            context.userdata.retries += 1
+            return FallbackAgent("What is your name")
+        return RouterAgent()
+
+
+class CollectReasonAgent(Agent):
+    def __init__(self) -> None:
+        super().__init__(
+            instructions=(
+                f"{BASE_STYLE} "
+                "Ask what the appointment is for in one short question. "
+                "When you have a clear reason, call set_reason."
+            )
+        )
+
+    async def on_enter(self):
+        await self.session.generate_reply()
+
+    @function_tool
+    async def set_reason(self, context: RunContext[AppointmentData], reason: str) -> Agent:
+        cleaned = (reason or "").strip()
+        context.userdata.reason = cleaned[:200] if cleaned else None
+        if not context.userdata.reason:
+            context.userdata.retries += 1
+            return FallbackAgent("What is the appointment for")
+        return RouterAgent()
+
+
+class CollectDateTimeAgent(Agent):
+    def __init__(self) -> None:
+        super().__init__(
+            instructions=(
+                f"{BASE_STYLE} "
+                "Ask for the preferred date and time. "
+                "If the user gives only one, ask for the missing one. "
+                "When you have both, call set_date_time with date and time as plain text."
+            )
+        )
+
+    async def on_enter(self):
+        await self.session.generate_reply()
+
+    @function_tool
+    async def set_date_time(self, context: RunContext[AppointmentData], date: str, time: str) -> Agent:
+        d = (date or "").strip()
+        t = (time or "").strip()
+        context.userdata.date = d[:60] if d else None
+        context.userdata.time = t[:60] if t else None
+
+        if not context.userdata.date or not context.userdata.time:
+            context.userdata.retries += 1
+            if not context.userdata.date and not context.userdata.time:
+                return FallbackAgent("What date and time would you like")
+            if not context.userdata.date:
+                return FallbackAgent("What date would you like")
+            return FallbackAgent("What time would you like")
+        return RouterAgent()
+
+
+class CollectContactAgent(Agent):
+    def __init__(self) -> None:
+        super().__init__(
+            instructions=(
+                f"{BASE_STYLE} "
+                "Ask for a contact method, either phone number or email. "
+                "Repeat it back once for clarity. "
+                "When you have it, call set_contact."
+            )
+        )
+
+    async def on_enter(self):
+        await self.session.generate_reply()
+
+    @function_tool
+    async def set_contact(self, context: RunContext[AppointmentData], contact: str) -> Agent:
+        c = (contact or "").strip()
+        context.userdata.contact = c[:120] if c else None
+        if not context.userdata.contact:
+            context.userdata.retries += 1
+            return FallbackAgent("What is the best phone number or email to reach you")
+        return RouterAgent()
+
+
+class ConfirmAgent(Agent):
+    def __init__(self) -> None:
+        super().__init__(
+            instructions=(
+                f"{BASE_STYLE} "
+                "Summarize the details from context: name, reason, date, time, contact. "
+                "Ask for confirmation with a yes or no. "
+                "If yes call confirm_yes. If no call confirm_no."
+            )
+        )
+
+    async def on_enter(self):
+        await self.session.generate_reply()
+
+    @function_tool
+    async def confirm_yes(self, context: RunContext[AppointmentData]) -> Agent:
+        context.userdata.confirmed = True
+        return RouterAgent()
+
+    @function_tool
+    async def confirm_no(self, context: RunContext[AppointmentData]) -> Agent:
+        context.userdata.confirmed = False
+        context.userdata.date = None
+        context.userdata.time = None
+        context.userdata.retries = 0
+        return CollectDateTimeAgent()
 
 
 server = AgentServer()
@@ -59,55 +260,23 @@ server.setup_fnc = prewarm
 
 @server.rtc_session()
 async def my_agent(ctx: JobContext):
-    # Logging setup
-    # Add any other context you want in all log entries here
-    ctx.log_context_fields = {
-        "room": ctx.room.name,
-    }
+    ctx.log_context_fields = {"room": ctx.room.name}
 
-    # Set up a voice AI pipeline using OpenAI, Cartesia, AssemblyAI, and the LiveKit turn detector
-    session = AgentSession(
-        # Speech-to-text (STT) is your agent's ears, turning the user's speech into text that the LLM can understand
-        # See all available models at https://docs.livekit.io/agents/models/stt/
-        stt=inference.STT(model="assemblyai/universal-streaming", language="en"),
-        # A Large Language Model (LLM) is your agent's brain, processing user input and generating a response
-        # See all available models at https://docs.livekit.io/agents/models/llm/
+    session: AgentSession[AppointmentData] = AgentSession(
+        stt=inference.STT(
+            model="assemblyai/universal-streaming", language="en"),
         llm=inference.LLM(model="openai/gpt-4.1-mini"),
-        # Text-to-speech (TTS) is your agent's voice, turning the LLM's text into speech that the user can hear
-        # See all available models as well as voice selections at https://docs.livekit.io/agents/models/tts/
         tts=inference.TTS(
             model="cartesia/sonic-3", voice="9626c31c-bec5-4cca-baa8-f8ba9e84c8bc"
         ),
-        # VAD and turn detection are used to determine when the user is speaking and when the agent should respond
-        # See more at https://docs.livekit.io/agents/build/turns
         turn_detection=MultilingualModel(),
         vad=ctx.proc.userdata["vad"],
-        # allow the LLM to generate a response while waiting for the end of turn
-        # See more at https://docs.livekit.io/agents/build/audio/#preemptive-generation
         preemptive_generation=True,
+        userdata=AppointmentData(),
     )
 
-    # To use a realtime model instead of a voice pipeline, use the following session setup instead.
-    # (Note: This is for the OpenAI Realtime API. For other providers, see https://docs.livekit.io/agents/models/realtime/))
-    # 1. Install livekit-agents[openai]
-    # 2. Set OPENAI_API_KEY in .env.local
-    # 3. Add `from livekit.plugins import openai` to the top of this file
-    # 4. Use the following session setup instead of the version above
-    # session = AgentSession(
-    #     llm=openai.realtime.RealtimeModel(voice="marin")
-    # )
-
-    # # Add a virtual avatar to the session, if desired
-    # # For other providers, see https://docs.livekit.io/agents/models/avatar/
-    # avatar = hedra.AvatarSession(
-    #   avatar_id="...",  # See https://docs.livekit.io/agents/models/avatar/plugins/hedra
-    # )
-    # # Start the avatar and wait for it to join
-    # await avatar.start(session, room=ctx.room)
-
-    # Start the session, which initializes the voice pipeline and warms up the models
     await session.start(
-        agent=Assistant(),
+        agent=IntroAgent(),
         room=ctx.room,
         room_options=room_io.RoomOptions(
             audio_input=room_io.AudioInputOptions(
@@ -118,7 +287,6 @@ async def my_agent(ctx: JobContext):
         ),
     )
 
-    # Join the room and connect to the user
     await ctx.connect()
 
 
