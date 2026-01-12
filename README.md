@@ -1,10 +1,6 @@
 Live demo: https://livekit-voice-agent-frontend.vercel.app/  
 Frontend repo: https://github.com/allwinandrews/livekit-voice-agent-frontend/
 
-<a href="https://livekit.io/">
-  <img src="./.github/assets/livekit-mark.png" alt="LiveKit logo" width="100" height="100">
-</a>
-
 # LiveKit Agents Starter – Python
 
 A complete Python-based voice agent built with [LiveKit Agents for Python](https://github.com/livekit/agents) and deployed on [LiveKit Cloud](https://cloud.livekit.io/).
