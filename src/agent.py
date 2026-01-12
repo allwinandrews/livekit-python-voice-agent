@@ -47,7 +47,8 @@ BASE_STYLE = (
 class EndAgent(Agent):
     def __init__(self, message: str = "Thanks. Goodbye.") -> None:
         super().__init__(
-            instructions=f"{BASE_STYLE} End the conversation politely. Say: {message}")
+            instructions=f"{BASE_STYLE} End the conversation politely. Say: {message}"
+        )
 
     async def on_enter(self):
         await self.session.generate_reply(allow_interruptions=False)
@@ -75,12 +76,17 @@ class FallbackAgent(Agent):
 class RouterAgent(Agent):
     def __init__(self) -> None:
         super().__init__(
-            instructions=f"{BASE_STYLE} Route to the next step based on missing fields.")
+            instructions=f"{BASE_STYLE} Route to the next step based on missing fields."
+        )
 
     async def on_enter(self):
         data = self.session.userdata
         if data.retries >= 3:
-            await self.session.switch_agent(EndAgent("Sorry, I am having trouble understanding. Please try again later."))
+            await self.session.switch_agent(
+                EndAgent(
+                    "Sorry, I am having trouble understanding. Please try again later."
+                )
+            )
             return
 
         if not data.name:
@@ -103,7 +109,9 @@ class RouterAgent(Agent):
             await self.session.switch_agent(ConfirmAgent())
             return
 
-        await self.session.switch_agent(EndAgent("Your appointment is confirmed. Goodbye."))
+        await self.session.switch_agent(
+            EndAgent("Your appointment is confirmed. Goodbye.")
+        )
 
 
 class IntroAgent(Agent):
@@ -156,7 +164,9 @@ class CollectReasonAgent(Agent):
         await self.session.generate_reply()
 
     @function_tool
-    async def set_reason(self, context: RunContext[AppointmentData], reason: str) -> Agent:
+    async def set_reason(
+        self, context: RunContext[AppointmentData], reason: str
+    ) -> Agent:
         cleaned = (reason or "").strip()
         context.userdata.reason = cleaned[:200] if cleaned else None
         if not context.userdata.reason:
@@ -180,7 +190,9 @@ class CollectDateTimeAgent(Agent):
         await self.session.generate_reply()
 
     @function_tool
-    async def set_date_time(self, context: RunContext[AppointmentData], date: str, time: str) -> Agent:
+    async def set_date_time(
+        self, context: RunContext[AppointmentData], date: str, time: str
+    ) -> Agent:
         d = (date or "").strip()
         t = (time or "").strip()
         context.userdata.date = d[:60] if d else None
@@ -211,7 +223,9 @@ class CollectContactAgent(Agent):
         await self.session.generate_reply()
 
     @function_tool
-    async def set_contact(self, context: RunContext[AppointmentData], contact: str) -> Agent:
+    async def set_contact(
+        self, context: RunContext[AppointmentData], contact: str
+    ) -> Agent:
         c = (contact or "").strip()
         context.userdata.contact = c[:120] if c else None
         if not context.userdata.contact:
@@ -263,8 +277,7 @@ async def my_agent(ctx: JobContext):
     ctx.log_context_fields = {"room": ctx.room.name}
 
     session: AgentSession[AppointmentData] = AgentSession(
-        stt=inference.STT(
-            model="assemblyai/universal-streaming", language="en"),
+        stt=inference.STT(model="assemblyai/universal-streaming", language="en"),
         llm=inference.LLM(model="openai/gpt-4.1-mini"),
         tts=inference.TTS(
             model="cartesia/sonic-3", voice="9626c31c-bec5-4cca-baa8-f8ba9e84c8bc"
